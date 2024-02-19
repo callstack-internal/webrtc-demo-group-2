@@ -1,13 +1,16 @@
-import { Drawer } from '@mui/material';
-
 import styles from './CallScreen.module.css';
 import { Button } from './Button';
-import { useState } from 'react';
+import { Drawer } from '@mui/material';
 import { DrawerContent } from './DrawerContent';
+import { useState } from 'react';
+import { Message } from '../App';
 
 type Props = {
   reactions: string[];
+  messages: Message[];
+  myId: string;
   onReaction: (reaction: string) => void;
+  onSend: (message: Message) => void;
   onDisconnect: () => void;
   remoteRef: React.RefObject<HTMLVideoElement>;
   localRef: React.RefObject<HTMLVideoElement>;
@@ -17,10 +20,13 @@ const emojis = ['❤️', '😆', '😲', '😢', '😠'];
 
 export function CallScreen({
   reactions,
+  messages,
+  myId,
   onReaction,
   onDisconnect,
   remoteRef,
   localRef,
+  onSend,
 }: Props) {
   const lastReaction = reactions[reactions.length - 1];
   const [isOpened, setIsOpened] = useState(false);
@@ -61,12 +67,12 @@ export function CallScreen({
             {lastReaction}
           </div>
         )}
-         <Drawer
+          <Drawer
             anchor={'right'}
             open={isOpened}
             onClose={() => {setIsOpened(false)}}
           >
-            <DrawerContent />
+            <DrawerContent messages={messages} myId={myId} onSend={onSend} />
           </Drawer>
       </div>
     </>
