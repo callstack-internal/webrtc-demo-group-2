@@ -1,5 +1,9 @@
+import { Drawer } from '@mui/material';
+
 import styles from './CallScreen.module.css';
 import { Button } from './Button';
+import { useState } from 'react';
+import { DrawerContent } from './DrawerContent';
 
 type Props = {
   reactions: string[];
@@ -19,6 +23,7 @@ export function CallScreen({
   localRef,
 }: Props) {
   const lastReaction = reactions[reactions.length - 1];
+  const [isOpened, setIsOpened] = useState(false);
 
   return (
     <>
@@ -47,6 +52,7 @@ export function CallScreen({
             </button>
           ))}
         </div>
+        <Button onClick={() => {setIsOpened(state => !state)}}>Open Messages</Button>
         <Button variant="danger" onClick={onDisconnect}>
           End call
         </Button>
@@ -55,6 +61,13 @@ export function CallScreen({
             {lastReaction}
           </div>
         )}
+         <Drawer
+            anchor={'right'}
+            open={isOpened}
+            onClose={() => {setIsOpened(false)}}
+          >
+            <DrawerContent />
+          </Drawer>
       </div>
     </>
   );

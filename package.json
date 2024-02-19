@@ -12,6 +12,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@emotion/react": "^11.11.3",
+    "@emotion/styled": "^11.11.0",
+    "@mui/material": "^5.15.10",
     "koa": "^2.15.0",
     "koa-route": "^3.2.0",
     "koa-websocket": "^7.0.0",
