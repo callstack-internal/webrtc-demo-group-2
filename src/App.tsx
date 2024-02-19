@@ -4,8 +4,12 @@ import { useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { CallScreen } from './components/CallScreen';
 import { IdleScreen } from './components/IdleScreen';
+import type { Message } from './types';
 
 type CallStatus = 'idle' | 'calling' | 'in-progress';
+
+const REACTIONS_CHANNEL = 'reactions';
+const CHAT_CHANNEL = 'chat';
 
 function App() {
   const id = useRef(nanoid()).current;
@@ -13,8 +17,10 @@ function App() {
   const [status, setStatus] = useState<CallStatus>('idle');
 
   const [reactions, setReactions] = useState<string[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
 
   const sendReactionRef = useRef<((reaction: string) => void) | null>(null);
+  const sendChatMessageRef = useRef<((message: string) => void) | null>(null);
   const disposeRef = useRef<(() => void) | null>(null);
 
   const remoteRef = useRef<HTMLVideoElement>(null);
@@ -29,7 +35,7 @@ function App() {
       // This is necessary when the app is deployed or tunnelled
       `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${
         location.host
-      }/socket`
+      }/socket`,
     );
 
     // Wait for the WebSocket connection to open
@@ -80,10 +86,25 @@ function App() {
       /**
        * Create a data channel to send text data between peers.
        */
-      const dataChannel = peerConnection.createDataChannel('reactions');
+      const reactionsDataChannel =
+        peerConnection.createDataChannel(REACTIONS_CHANNEL);
+      const chatDataChannel = peerConnection.createDataChannel(CHAT_CHANNEL);
 
       sendReactionRef.current = (reaction: string) => {
-        dataChannel.send(reaction);
+        reactionsDataChannel.send(reaction);
+      };
+
+      sendChatMessageRef.current = (message: string) => {
+        const messageData: Message = {
+          uid: id,
+          ts: Date.now(),
+          messageId: nanoid(),
+          body: message,
+        };
+
+        // Add it to the state as it won't be received from the peerConnection as it's not dispatched to the local end of the connection
+        setMessages((messages) => [...messages, messageData]);
+        chatDataChannel.send(JSON.stringify(messageData));
       };
 
       /**
@@ -106,9 +127,15 @@ function App() {
        * Receive text data from the other peer and store it in the state.
        */
       peerConnection.ondatachannel = ({ channel }) => {
-        if (channel.label === 'reactions') {
+        if (channel.label === REACTIONS_CHANNEL) {
           channel.onmessage = ({ data }) => {
             setReactions((reactions) => [...reactions, data]);
+          };
+        }
+
+        if (channel.label === CHAT_CHANNEL) {
+          channel.onmessage = ({ data }) => {
+            setMessages((messages) => [...messages, JSON.parse(data)]);
           };
         }
       };
@@ -173,7 +200,7 @@ function App() {
             JSON.stringify({
               id,
               description: peerConnection.localDescription,
-            })
+            }),
           );
         } catch (error) {
           console.error(error);
@@ -244,14 +271,14 @@ function App() {
           // If we got an offer, create an answer and send it to the other peer
           if (data.description.type === 'offer') {
             await peerConnection.setLocalDescription(
-              await peerConnection.createAnswer()
+              await peerConnection.createAnswer(),
             );
 
             webSocket.send(
               JSON.stringify({
                 id,
                 description: peerConnection.localDescription,
-              })
+              }),
             );
           }
         }
@@ -260,7 +287,7 @@ function App() {
         if (data.candidate) {
           try {
             await peerConnection.addIceCandidate(
-              new RTCIceCandidate(data.candidate)
+              new RTCIceCandidate(data.candidate),
             );
           } catch (error) {
             if (!ignoreOffer) {
@@ -286,6 +313,7 @@ function App() {
 
       setStatus('idle');
       setReactions([]);
+      setMessages([]);
 
       disposeRef.current?.();
     } catch (error) {
@@ -300,11 +328,17 @@ function App() {
     sendReactionRef.current?.(reaction);
   };
 
+  const onChatMessage = (message: string) => {
+    sendChatMessageRef.current?.(message);
+  };
+
   if (status === 'in-progress') {
     return (
       <CallScreen
+        messages={messages}
         reactions={reactions}
         onReaction={onReaction}
+        onChatMessage={onChatMessage}
         onDisconnect={onDisconnect}
         remoteRef={remoteRef}
         localRef={localRef}
